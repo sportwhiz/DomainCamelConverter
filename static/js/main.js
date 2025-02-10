@@ -752,6 +752,7 @@ function displayResults(results) {
 }
 
 
+
 function downloadMatchingDomains(matchingRows, filename) {
     if (!matchingRows || matchingRows.length === 0) {
         showNotification('No matching domains found');
@@ -809,10 +810,12 @@ function downloadDomainsWithWord(word) {
 
 function downloadDomainsWithSldLength(targetLength) {
     console.log('Downloading domains with SLD length:', targetLength);
-    if (!window.lastProcessedData || !window.lastProcessedData.results) {        console.error('No processed data available');
+    if (!window.lastProcessedData || !window.lastProcessedData.results) {
+        console.error('No processed data available');
         showNotification('No data available');
         return;
-    }const matchingDomains = window.lastProcessedData.results.filter(result =>
+    }
+    const matchingDomains = window.lastProcessedData.results.filter(result =>
         result.sld_length === targetLength
     );
 
@@ -944,6 +947,28 @@ function updateConvertedDomain(element) {
     const originalDomain = row.cells[0].textContent;
     const convertedCell = row.cells[1];
 
+    // Get the domain extension
+    const extension = originalDomain.split('.').slice(1).join('.');
+
+    // Create camelCase version from new split words for validation
+    const camelCaseWords = newWords.split(' ').map((word, index) => {
+        if (word.toLowerCase() === "ai") return "AI";
+        if (ACRONYMS.has(word.toLowerCase())) return word.toUpperCase();
+        return index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1);
+    }).join('');
+
+    // Create new domain for validation
+    const newConvertedDomain = `${camelCaseWords}.${extension}`;
+
+    // Validate that the characters match (ignoring case)
+    if (!compareDomainsCharacters(originalDomain, newConvertedDomain)) {
+        // Show notification popup
+        showNotification('Characters do not match the Original Domain');
+        // Revert the changes
+        element.textContent = originalWords;
+        return;
+    }
+
     // Update the processedData
     const domainData = processedData.results.find(result => result.original === originalDomain);
     if (domainData) {
@@ -952,18 +977,7 @@ function updateConvertedDomain(element) {
         domainData.word_count = newWords.split(' ').length;
         row.cells[3].textContent = domainData.word_count;
 
-        // Create camelCase version from new split words
-        const camelCaseWords = newWords.split(' ').map((word, index) => {
-            if (word.toLowerCase() === "ai") return "AI";
-            if (ACRONYMS.has(word.toLowerCase())) return word.toUpperCase();
-            return index === 0 ? word : word.charAt(0).toUpperCase() + word.slice(1);
-        }).join('');
-
-        // Get the domain extension
-        const extension = originalDomain.split('.').slice(1).join('.');
-
         // Update converted domain
-        const newConvertedDomain = `${camelCaseWords}.${extension}`;
         domainData.converted = newConvertedDomain;
         convertedCell.textContent = newConvertedDomain;
 
@@ -997,27 +1011,6 @@ function updateConvertedDomain(element) {
     }
 }
 
-// Helper function to calculate word cloud layout
-function calculate_word_cloud_layout(words, counts, width = 800, height = 400) {
-    const positions = [];
-    const maxCount = Math.max(...counts);
-    const minCount = Math.min(...counts);
-    const countRange = maxCount - minCount + 1;
-
-    words.forEach((word, i) => {
-        const size = 20 + (counts[i] - minCount) * (60 / countRange);
-        positions.push({
-            text: word,
-            size: Math.round(size),
-            x: Math.random() * width - width/2,
-            y: Math.random() * height - height/2,
-            rotate: 0
-        });
-    });
-
-    return positions;
-}
-
 function downloadDomains(filename) {
     if (!window.lastProcessedData || !window.lastProcessedData.results) {
         console.error('No processed data available');
@@ -1026,7 +1019,6 @@ function downloadDomains(filename) {
     }
     downloadMatchingDomains(window.lastProcessedData.results, filename);
 }
-
 
 
 function downloadWordCloudData(filename) {
@@ -1207,7 +1199,6 @@ document.addEventListener('DOMContentLoaded', function () {
         reader.readAsText(file);
     }
 
-
     // Download handlers for each tab
     document.getElementById('downloadDomainsBtn').addEventListener('click', () => downloadDomains('converted_domains.csv'));
     document.getElementById('downloadWordCloudBtn').addEventListener('click', () => downloadWordCloudData('word_cloud_data.csv'));
@@ -1385,3 +1376,24 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     });
 });
+
+// Helper function to calculate word cloud layout
+function calculate_word_cloud_layout(words, counts, width = 800, height = 400) {
+    const positions = [];
+    const maxCount = Math.max(...counts);
+    const minCount = Math.min(...counts);
+    const countRange = maxCount - minCount + 1;
+
+    words.forEach((word, i) => {
+        const size = 20 + (counts[i] - minCount) * (60 / countRange);
+        positions.push({
+            text: word,
+            size: Math.round(size),
+            x: Math.random() * width - width / 2,
+            y: Math.random() * height - height / 2,
+            rotate: 0
+        });
+    });
+
+    return positions;
+}
