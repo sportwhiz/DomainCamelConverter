@@ -752,7 +752,6 @@ function displayResults(results) {
 }
 
 
-
 function downloadMatchingDomains(matchingRows, filename) {
     if (!matchingRows || matchingRows.length === 0) {
         showNotification('No matching domains found');
@@ -946,6 +945,8 @@ function updateConvertedDomain(element) {
     const row = element.closest('tr');
     const originalDomain = row.cells[0].textContent;
     const convertedCell = row.cells[1];
+    const confidenceCell = row.querySelector('.confidence-cell');
+    const hideConfident = document.getElementById('hideConfidentDomains').checked;
 
     // Get the domain extension
     const extension = originalDomain.split('.').slice(1).join('.');
@@ -981,6 +982,30 @@ function updateConvertedDomain(element) {
         domainData.converted = newConvertedDomain;
         convertedCell.textContent = newConvertedDomain;
 
+        // Update confidence to 100% and mark as reviewed
+        domainData.confidence = 100;
+        domainData.reviewed = true;
+        confidenceCell.dataset.confidence = "100";
+        confidenceCell.innerHTML = `
+            <div class="confidence-bar" style="width: 100%"></div>
+            <span>100%</span>
+        `;
+
+        // If in review mode, this row should now be hidden
+        if (hideConfident) {
+            row.style.display = 'none';
+        }
+
+        // Update the review count
+        const totalDomains = processedData.results.length;
+        const lessConfidentDomains = processedData.results.filter(result =>
+            result.confidence !== 100 && !result.reviewed
+        ).length;
+        const reviewCount = document.getElementById('reviewCount');
+        if (reviewCount) {
+            reviewCount.textContent = `${lessConfidentDomains}/${totalDomains}`;
+        }
+
         // Recalculate word statistics
         const wordFreq = new Map();
         processedData.results.forEach(result => {
@@ -999,16 +1024,12 @@ function updateConvertedDomain(element) {
 
         processedData.word_stats = wordStats;
 
-        // Calculate word cloud data
-        const words = wordStats.map(stat => stat.word);
-        const counts = wordStats.map(stat => stat.count);
-        processedData.word_cloud = calculate_word_cloud_layout(words, counts);
-
         // Update displays
         updateSummaryStats(processedData);
         displayWordStats(processedData.word_stats);
         createWordCloud(processedData.word_cloud, 'wordCloudContainer');
     }
+
 }
 
 function downloadDomains(filename) {
@@ -1019,6 +1040,7 @@ function downloadDomains(filename) {
     }
     downloadMatchingDomains(window.lastProcessedData.results, filename);
 }
+
 
 
 function downloadWordCloudData(filename) {
