@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C.A.M.E.L.</title>
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/favicon.png') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3-cloud/1.2.5/d3.layout.cloud.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-lg-8 col-xl-6">
+                <div class="text-center mt-5 mb-4">
+                    <div class="logo-container mb-3">
+                        <img src="{{ url_for('static', filename='images/camellogo.png') }}" alt="Camel Logo" class="img-fluid rounded-circle border" style="max-height: 100px; object-fit: contain; background-color: white;">
+                    </div>
+                    <h1>C.A.M.E.L.</h1>
+                    <p class="text-muted">Camel-casing Automation and Metrics Execution Logic</p>
+                </div>
+
+                <div class="input-methods mb-4">
+                    <ul class="nav nav-tabs" id="inputTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="paste-tab" data-bs-toggle="tab" data-bs-target="#paste" type="button" role="tab">Paste Domains</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="upload-tab" data-bs-toggle="tab" data-bs-target="#upload" type="button" role="tab">Upload CSV</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content mt-3" id="inputTabsContent">
+                        <div class="tab-pane fade show active" id="paste" role="tabpanel">
+                            <div class="form-group">
+                                <textarea id="domainsList" class="form-control" rows="6" placeholder="Enter domain names (one per line)"></textarea>
+                                <small class="text-muted">Enter each domain on a new line</small>
+                            </div>
+                            <div class="text-center mt-3">
+                                <button id="convertBtn" class="btn btn-primary">
+                                    <i class="fas fa-sync-alt"></i> Convert Domains
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="tab-pane fade" id="upload" role="tabpanel">
+                            <div class="upload-container">
+                                <form id="uploadForm" class="text-center">
+                                    <div class="upload-area" id="dropZone">
+                                        <i class="fas fa-cloud-upload-alt"></i>
+                                        <p>Drag & Drop your CSV file here</p>
+                                        <p>or</p>
+                                        <label for="fileInput" class="btn btn-primary">Choose File</label>
+                                        <input type="file" id="fileInput" accept=".csv" hidden>
+                                    </div>
+                                    <small class="text-muted mt-2">Only CSV files are accepted</small>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="processingIndicator" class="text-center mt-4" style="display: none;">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p class="mt-2">Processing your domains...</p>
+        </div>
+
+        <div id="errorMessage" class="alert alert-danger mt-4" style="display: none;"></div>
+
+        <div id="resultContainer" class="mt-4" style="display: none;">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h3>Results</h3>
+            </div>
+
+            <ul class="nav nav-tabs mb-3" id="resultTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="domains-tab" data-bs-toggle="tab" data-bs-target="#domains" type="button" role="tab">Converted Domains</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="wordcloud-tab" data-bs-toggle="tab" data-bs-target="#wordcloud" type="button" role="tab">Word Cloud</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="stats-tab" data-bs-toggle="tab" data-bs-target="#stats" type="button" role="tab">Word Statistics</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="sld-stats-tab" data-bs-toggle="tab" data-bs-target="#sld-stats" type="button" role="tab">SLD Length Stats</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tld-stats-tab" data-bs-toggle="tab" data-bs-target="#tld-stats" type="button" role="tab">TLD Stats</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="summary-tab" data-bs-toggle="tab" data-bs-target="#summary" type="button" role="tab">Summary</button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="resultTabsContent">
+                <div class="tab-pane fade show active" id="domains" role="tabpanel">
+                    <div class="d-flex justify-content-between mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="hideConfidentDomains">
+                            <label class="form-check-label d-inline-flex align-items-center gap-2" for="hideConfidentDomains" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="right"
+                                   data-bs-html="true"
+                                   title="Filter less certain results to review domains where word splits may need correction. Edit the Split Words column as needed, then click 'Mark as Reviewed' to confirm accuracy. All changes will be saved and reflected in your CSV download and analysis tabs.">
+                                Review Less Certain Results
+                                <span id="reviewCount" class="badge bg-primary"></span>
+                                <i class="fas fa-info-circle text-primary" 
+                                   data-bs-toggle="tooltip" 
+                                   data-bs-placement="right"
+                                   data-bs-html="true"
+                                   title="Filter less certain results to review domains where word splits may need correction. Edit the Split Words column as needed, then click 'Mark as Reviewed' to confirm accuracy. All changes will be saved and reflected in your CSV download and analysis tabs."></i>
+                            </label>
+                        </div>
+                        <button id="downloadDomainsBtn" class="btn btn-success">
+                            <i class="fas fa-download"></i> Download Domains CSV
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Original Domain</th>
+                                    <th>Converted Domain</th>
+                                    <th>Split Words</th>
+                                    <th data-sort="wordCount" style="cursor: pointer;">Word Count</th>
+                                    <th data-sort="confidence" style="cursor: pointer;">Confidence %</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resultTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="wordcloud" role="tabpanel">
+                    <div class="d-flex justify-content-end mb-3">
+                        <button id="downloadWordCloudBtn" class="btn btn-success">
+                            <i class="fas fa-download"></i> Download Word Cloud CSV
+                        </button>
+                    </div>
+                    <div id="wordCloudContainer" class="word-cloud-container">
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="stats" role="tabpanel">
+                    <div class="d-flex justify-content-between mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="filterCommonWords" checked>
+                            <label class="form-check-label" for="filterCommonWords">Filter Common Words</label>
+                        </div>
+                        <button id="downloadWordStatsBtn" class="btn btn-success">
+                            <i class="fas fa-download"></i> Download Word Stats CSV
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Word</th>
+                                    <th>Occurrences</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="statsTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="sld-stats" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <button id="toggleGraphLabels" class="btn btn-outline-secondary btn-sm">
+                            <i class="fas fa-tag"></i> Toggle Value Labels
+                        </button>
+                        <button id="downloadSldStatsBtn" class="btn btn-success">
+                            <i class="fas fa-download"></i> Download SLD Stats CSV
+                        </button>
+                    </div>
+                    <div id="sldBarGraph" class="mb-4" style="width: 100%; height: 300px;"></div>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>SLD Length</th>
+                                    <th>Number of Domains</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="sldStatsTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="tld-stats" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div class="input-group" style="max-width: 300px;">
+                            <input type="text" id="tldLimit" class="form-control" value="1-20" placeholder="Range (e.g., 1-20)">
+                            <button id="updateTldLimit" class="btn btn-outline-secondary">Update Graph</button>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button id="toggleTldGraphLabels" class="btn btn-outline-secondary">
+                                <i class="fas fa-tag"></i> Toggle Value Labels
+                            </button>
+                            <button id="downloadTldStatsBtn" class="btn btn-success">
+                                <i class="fas fa-download"></i> Download TLD Stats CSV
+                            </button>
+                        </div>
+                    </div>
+                    <div id="tldBarGraph" class="mb-4" style="width: 100%; height: 300px;"></div>
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>TLD</th>
+                                    <th>Number of Domains</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tldStatsTable">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="tab-pane fade" id="summary" role="tabpanel">
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Total Domains</h5>
+                                    <p class="card-text h2" id="totalDomains">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Unique Words</h5>
+                                    <p class="card-text h2" id="totalUniqueWords">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h5 class="card-title">Unique TLDs</h5>
+                                    <p class="card-text h2" id="totalTlds">0</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">Word Cloud</h5>
+                                    <div id="summaryWordCloud" class="word-cloud-container"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body d-flex flex-column">
+                                    <h5 class="card-title">Top 30 Words</h5>
+                                    <div class="table-responsive flex-grow-1" style="height: 400px; overflow-y: auto;">
+                                        <table class="table table-sm">
+                                            <thead>
+                                                <tr>
+                                                    <th>Word</th>
+                                                    <th class="text-end">Count</th>
+                                                    <th class="text-end">Percentage</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody id="summaryWordTable">
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">SLD Length Distribution</h5>
+                                    <div id="summarySldGraph" style="width: 100%; height: 300px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">Top TLD Distribution</h5>
+                                    <div id="summaryTldGraph" style="width: 100%; height: 300px;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
